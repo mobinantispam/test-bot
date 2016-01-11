@@ -1,49 +1,76 @@
--- Invite other user to the chat group.
--- Use !invite name User_name or !invite id id_number
--- The User_name is the print_name (there are no spaces but _)
+--[[
+Invite other user to the chat group.
+
+Use !invite 1234567890 (where 1234567890 is id_number) to invite a user by id_number.
+This is the most reliable method.
+
+Use !invite @username to invite a user by @username.
+Less reliable. Some users don't have @username.
+
+Use !invite Type print_name Here to invite a user by print_name.
+Unreliable. Avoid if possible.
+]]—
 
 do
 
-local function callback(extra, success, result)
-  vardump(success)
-  vardump(result)
-end
-
-local function run(msg, matches)
-  local user = matches[2]
-
-  -- User submitted a user name
-  if matches[1] == "name" then
-    user = string.gsub(user," ","_")
-  end
-  
-  -- User submitted an id
-  if matches[1] == "id" then
-    user = 'user#id'..user
+  — Think it's kind of useless. Just to suppress '*** lua: attempt to call a nil value'
+  local function callback(extra, success, result)
+    if success == 1 and extra ~= false then
+      return extra.text
+    else
+      return send_large_msg(chat, "Can't invite user to this group.")
+    end
   end
 
-  -- The message must come from a chat group
-  if msg.to.type == 'chat' then
-    local chat = 'chat#id'..msg.to.id
-    chat_add_user(chat, user, callback, false)
-    return "Add: "..user.." to "..chat
-  else 
-    return 'This isnt a chat group!'
+  local function resolve_username(extra, success, result)
+    if success == 1 then
+      chat_add_user(extra.chat, 'user#id'..result.id, callback, false)
+      return extra.text
+    else
+      return send_large_msg(extra.chat, "Can't invite user to this group.")
+    end
   end
 
-end
+  local function action_by_reply(extra, success, result)
+    if success == 1 then
+      chat_add_user('chat#id'..result.to.id, 'user#id'..result.from.id, callback, false)
+    else
+      return send_large_msg('chat#id'..result.to.id, "Can't invite user to this group.")
+    end
+  end
 
-return {
-  description = "Invite other user to the chat group", 
-  usage = {
-    "!invite name [user_name]", 
-    "!invite id [user_id]" },
-  patterns = {
-    "^!invite (name) (.*)$",
-    "^!invite (id) (%d+)$"
-  }, 
-  run = run,
-  moderation = true 
-}
+  local function run(msg, matches)
+    local receiver = get_receiver(msg)
+    local text = "Add: "..matches[1].." to "..receiver
+    if is_chat_msg(msg) then
+      if msg.reply_id and msg.text == "!invite" then
+        msgr = get_message(msg.reply_id, action_by_reply, {msg=msg})
+      end
+      if string.match(matches[1], '^%d+$') then
+        chat_add_user(receiver, 'user#id'..matches[1], callback, {chat=receiver, text=text})
+      elseif string.match(matches[1], '^@.+$') then
+        msgr = res_user(string.gsub(matches[1], '@', ''), resolve_username, {chat=receiver, text=text})
+      else
+        chat_add_user(receiver, string.gsub(matches[1], ' ', '_'), callback, {chat=receiver, text=text})
+      end
+    else
+      return 'This isnt a chat group!'
+    end
+  end
+
+  return {
+    description = 'Invite other user to the chat group.',
+    usage = {Use !invite 1234567890 (where 1234567890 is id_number) to invite a user by id_number
+              Use !invite @username to invite a user by @username
+      ' 
+    },
+    patterns = {
+      "^!invite$",
+      "^!invite (.*)$",
+      "^!invite (%d+)$"
+    },
+    run = run,
+    moderated = true
+  }
 
 end
