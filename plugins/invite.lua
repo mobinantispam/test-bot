@@ -9,11 +9,11 @@ Less reliable. Some users don't have @username.
 
 Use !invite Type print_name Here to invite a user by print_name.
 Unreliable. Avoid if possible.
-]]—
+]]--
 
 do
 
-  — Think it's kind of useless. Just to suppress '*** lua: attempt to call a nil value'
+  -- Think it's kind of useless. Just to suppress '*** lua: attempt to call a nil value'
   local function callback(extra, success, result)
     if success == 1 and extra ~= false then
       return extra.text
